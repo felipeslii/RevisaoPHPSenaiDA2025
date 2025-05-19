@@ -2,10 +2,263 @@
 // Inicia a sessão PHP para permitir o armazenamento de dados entre páginas através de cookies
 session_start();
 
+// conexão com o banco de dados MySQL
+$host = "localhost"; 
+$usuario = "root";
+$senha = "Senai@118";
+$banco = "sistema_simples";
 
-// 1º Digitação da lógica em PHP (Aqui)
+// Função que estabelece conexão com o banco de dados
+function conectarBD() {
+    global $host, $usuario, $senha, $banco;
 
+    $conexao = new mysqli($host, $usuario, $senha, $banco);
+    if ($conexao->connect_error) {
+        die("Erro de conexão: " . $conexao->connect_error);
+    }
 
+    echo "Conecxão realizada com sucesso!<br><br>";
+
+    // Retorna o objeto de conexão para uso posterior
+    return $conexao;
+}
+
+// _____________________________________________________________
+// Validações e inicializações de variáveis
+
+// Função que valida se um campo de formulário não está vazio
+function validarCampo($campo) {
+    $campo = trim($campo);
+    return !empty($campo);
+}
+
+function sanitizar($dado) {
+    // Remove espaços em branco do início e do fim da string
+    $dado = trim($dado);
+    // Remove barras invertidas (backslashes) da string
+    $dado = stripslashes($dado);
+    // Converte caracteres especiais em entidades HTML
+    $dado = htmlspecialchars($dado);
+    // Retorna o dado limpo e seguro
+    return $dado;
+}
+
+// Inicializa variáveis que serão usadas no sistema
+$mensagem = ""; // Mensagem de feedback para o usuário
+$nome = ""; // Nome do item a ser cadastrado ou editado
+$id_para_editar = 0; // ID do item a ser editado
+$operacao = "cadastrar"; // Define a operação atual (cadastrar ou editar)
+
+// Verifica se a requisição é do tipo GET (via URL)
+//Obs: Explicação detalhada no arquivo (guia_variaveis_explicação.md)
+if ($_SERVER["REQUEST_METHOD"] == "GET") {
+
+    //__________________________________________________________________________________
+    // Saida do sistema (logout)
+
+    //Verifica se foi solicitado logout (presença do parâmetro logout na URL)
+    if (isset($_GET["logout"])) {
+        // Destrói a sessão atual, removendo todas as variáveis de sessão
+        session_destroy();
+        // Redireciona para a mesma página, agora sem a sessão ativa
+        header("Location: " . $_SERVER["PHP_SELF"]);
+        // Encerra o script após o redirecionamento
+        exit;
+
+    }
+
+    //____________________________________________________________________________________
+    // Edição (UPDATE)
+
+    // Verifica se foi solicitada a edição de um item e se o usuário está logado
+    if (isset($_GET["editar"]) && is_numeric($_GET["editar"]) && isset($_SESSION["logado"])) {
+        // Converte o ID recebido para inteiro e armazena
+        $id_para_editar = (int)$_GET["editar"];
+        // Muda a operação para o modo de edição
+        $operacao = "editar";
+
+        // Conecta ao banco de dados
+        $conexao = conectarBD();
+        // Prepara a consulta SQL para buscar o item pelo ID
+        // $stmt é uma abreviação para "statement", usada para armazenar uma consulta SQL preparada.
+        $stmt = $conexao->prepare("SELECT nome FROM itens WHERE id = ?");
+        // Vincula o parâmetro ID à consulta (i = integer)
+        $stmt->bind_param("i", $id_para_editar);
+        // Executa a consulta preparada
+        $stmt->execute();
+        // Obtém o resultado da consulta
+        $resultado = $stmt->get_result();
+
+        // Verifica se o item foi encontrado
+        // fetch_assoc() é um método do objeto mysqli_result no PHP. Ele é usado para buscar uma linha do resultado da consulta SQL e retorná-la como um array associativo.
+        if ($registro = $resultado->fetch_assoc()) {
+            // Atribuí o nome encontrado à variável $nome para preencher o formulário.
+            $nome = $registro["nome"];
+        }
+
+        // Fecha a declaração preparada para liberar recursos
+        $stmt->close();
+        // Fecha a conexão com o banco de dados
+        $conexao->close();
+    }
+
+    //____________________________________________________________________________________
+    // Exclusão (DELETE)
+
+    // Verifica se foi solicitado excluir um item e se o usuário está logado
+    if (isset($_GET["excluir"]) && is_numeric($_GET["excluir"]) && isset($_SESSION["logado"])) {
+        // Converte o ID recebido para inteiro
+        $id_para_excluir = (int)$_GET["excluir"];
+
+        // Conecta ao banco de dados
+        $conexao = conectarBD();
+        // Prepara a consulta SQL para excluir o item pelo ID
+        $stmt = $conexao->prepare("DELETE FROM itens WHERE id = ?");
+        // Vincula o parâmetro ID à consulta (i = integer)
+        $stmt->bind_param("i", $id_para_excluir);
+        // Executa a consulta preparada
+        if ($stmt->execute()) {
+            // Se a exclusão for bem-sucedida, exibe mensagem de sucesso
+            $mensagem = "Item excluído com sucesso!";
+        } else {
+            // Se ocorrer um erro, exibe mensagem de erro
+            $mensagem = "Erro ao excluir item: " . $conexao->error;
+        }
+
+        // Fecha a declaração preparada e a conexão com o banco de dados
+        $stmt->close();
+        $conexao->close();
+    }
+}
+
+// ______________________________________________________________________________________
+// Entrada no sistema (LOGIN)
+
+// Verifica se a requisição é do tipo POST (formulário enviado)
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Verifica se a ação é de Login
+    if (isset($_POST["acao"]) && $_POST["acao"] == "login") {
+        // Obtém e sanitiza os dados de usuário e senha
+        $usuario_login = sanitizar($_POST["usuario"] ?? "");
+        $senha_login = sanitizar($_POST["senha"] ?? "");
+
+        // Valida se ambos os campos foram preenchidos
+        if (!validarCampo($usuario_login) || !validarCampo($senha_login)) {
+            // Se algum campo estiver vazio, exibe mensagem de erro
+            $mensagem = "Por favor, preencha todos os campos!";
+        } else {
+            // Verifica se as credenciais correspondem ao par fixo admin/admin
+            if ($usuario_login == "admin" && $senha_login == "admin") {
+                // se as credenciais estiverem corretas, marca o usuário como logado na sessão
+                $_SESSION["logado"] = true;
+                // Armazena o nome do usuário na sessão
+                $_SESSION["usuario"] = $usuario_login;
+                // Define mensagem de sucesso
+                $mensagem = "Login realizado com sucesso!";
+            } else {
+                // Se as credenciais estiverem incorretas, exibe mensagem de erro
+                $mensagem = "Usuário ou senha inválidos!";
+            }
+
+        }
+    }
+
+    // _____________________________________________________________________________________
+    // Verifica se a ação é de Cadastrar ou Atualizar item (INSERT ou UPDATE)
+
+    //Verifica se a ação é de cadastro ou atualização de item e se o usuário está logado
+    if ((isset($_POST["acao"]) && ($_POST["acao"] == "cadastrar" || $_POST["acao"] == "atualizar")) && isset($_SESSION["logado"])) {
+        // Obtém e sanitiza o nome do item
+        $nome = sanitizar($_POST["nome"] ?? "");
+
+        // Valida se o campo nome foi preenchido
+        if (!validarCampo($nome)) {
+            // Se o campo estiver vazio, exibe mensagem de erro
+            $mensagem = "Por favor, preencha o nome do item!";
+        } else {
+            // Conecta ao banco de dados
+            $conexao = conectarBD();
+
+            // _____________________________________________________________________________________
+            // Cadastro (INSERT)
+
+            // Verifica se a ação é de cadastrar um novo item
+            if ($_POST["acao"] == "cadastrar") {
+                // Prepara a consulta SQL para inserir um novo item
+                $stmt = $conexao->prepare("INSERT INTO itens (nome) VALUES (?)");
+                // Vincula o parâmetro nome à consulta (s = string)
+                $stmt->bind_param("s", $nome);
+                // Executa a consulta preparada
+                if ($stmt->execute()) {
+                    // Se o cadastro for bem-sucedido, exibe mensagem de sucesso
+                    $mensagem = "Item cadastrado com sucesso!";
+                    // Limpa o campo nome após o cadastro
+                    $nome = "";
+                } else {
+                    // Se ocorrer um erro, exibe mensagem de erro
+                    $mensagem = "Erro ao cadastrar item: " . $conexao->error;
+                }
+            }
+
+            // _____________________________________________________________________________________
+            // Atualização (UPDATE)
+
+            // Verifica se a ação é de atualizar um item existente
+            else if ($_POST["acao"] == "atualizar") {
+                // Obtém e sanitiza o ID do item a ser atualizado
+                $id = (int)$_POST["id"];
+                // Prepara a consulta SQL para atualizar o item pelo ID
+                $stmt = $conexao->prepare("UPDATE itens SET nome = ? WHERE id = ?");
+                // Vincula os parâmetros nome e ID à consulta (s = string, i = integer)
+                $stmt->bind_param("si", $nome, $id);
+                // Executa a consulta preparada
+                if ($stmt->execute()) {
+                    // Se a atualização for bem-sucedida, exibe mensagem de sucesso
+                    $mensagem = "Item atualizado com sucesso!";
+                    // Redireciona para a página inicial após a atualização
+                    header("Location: " . $_SERVER["PHP_SELF"]);
+                    // Encerra o script após o redirecionamento e garantir o mesmo
+                    exit;
+                } else {
+                    // Se ocorrer um erro, exibe mensagem de erro
+                    $mensagem = "Erro ao atualizar item: " . $conexao->error;
+                }
+            }
+
+            // Fecha a declaração preparada e a conexão com o banco de dados
+            $stmt->close();
+            $conexao->close();
+        }
+    }
+}
+
+// ______________________________________________________________________________________
+// Retorna todos os itens cadastrados no banco de dados (Read)
+
+// Função que consulta e retorna todos os itens cadastrados no banco de dados
+function listarItens() {
+    // Inicializa um array vazio para armazenar os itens
+    $itens = array();
+
+    // Conecta ao banco de dados
+    $conexao = conectarBD();
+    // Executa uma consulta SQL para selecionar todos os itens ordenados por ID
+    $resultado = $conexao->query("SELECT id, nome FROM itens ORDER BY id ASC");
+
+    // Verifica se a consulta retornou resultados
+    if ($resultado->num_rows > 0) {
+        // Itera sobre cada linha do resultado
+        while ($registro = $resultado->fetch_assoc()) {
+            // Adiciona cada item ao array de itens
+            $itens[] = $registro;
+        }
+    }
+
+    // Fecha a conexão com o banco de dados
+    $conexao->close();
+    // Retorna o array de itens
+    return $itens;
+}
 ?>
 
 <!-- __________________________________________________________________________________
@@ -17,6 +270,144 @@ HTML + PHP Para exibição do sistema -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema PHP Simplificado</title>
+
+    
+        <style>
+        /* Estilo geral da página */
+        body {
+            background-color: #f4f4f4; /* Cor de fundo cinza claro */
+            font-family: Arial, sans-serif; /* Fonte Arial */
+            margin: 0; /* Remove margens padrão */
+            padding: 20px; /* Espaçamento em volta do conteúdo */
+            color: #333; /* Cor do texto padrão */
+        }
+
+        /* Container principal */
+        .container {
+            max-width: 800px; /* Largura máxima de 800px */
+            margin: 0 auto; /* Centraliza o container na tela */
+            background-color: #fff; /* Fundo branco */
+            padding: 20px; /* Espaçamento interno */
+            border-radius: 5px; /* Bordas arredondadas */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+        }
+
+        /* Títulos */
+        h1, h2 {
+            color: #333; /* Cor do texto cinza escuro */
+        }
+
+        h1 {
+            text-align: left; /* Alinhamento à esquerda */
+        }
+
+        /* Cabeçalho (Login/Logout) */
+        .header {
+            display: flex;
+            justify-content: space-between; /* Título à esquerda, usuário à direita */
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        /* Tabelas de itens */
+        table {
+            width: 100%; /* Largura total */
+            border-collapse: collapse; /* Remove espaços entre bordas */
+            margin-top: 20px; /* Espaçamento acima da tabela */
+        }
+
+        th, td {
+            padding: 10px; /* Espaçamento interno */
+            text-align: left; /* Alinhamento do texto */
+            border: 1px solid #ddd; /* Borda cinza clara */
+        }
+
+        th {
+            background-color: #f4f4f4; /* Fundo cinza claro */
+            color: #333; /* Cor do texto */
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9; /* Fundo alternado */
+        }
+
+        tr:hover {
+            background-color: #f1f1f1; /* Fundo ao passar o mouse */
+        }
+
+        /* Formulários */
+        input[type="text"],
+        input[type="password"] {
+            width: 100%; /* Largura total */
+            padding: 8px; /* Espaçamento interno */
+            border: 1px solid #ddd; /* Borda fina cinza */
+            border-radius: 4px; /* Bordas arredondadas */
+            box-sizing: border-box; /* Inclui padding e borda no tamanho total */
+            margin-bottom: 10px; /* Espaçamento inferior */
+        }
+
+        input[type="submit"] {
+            background-color: #4CAF50; /* Fundo verde */
+            color: #fff; /* Texto branco */
+            border: none; /* Remove borda */
+            padding: 10px 20px; /* Espaçamento interno */
+            border-radius: 3px; /* Bordas arredondadas */
+            cursor: pointer; /* Cursor de ponteiro */
+            font-size: 16px; /* Tamanho da fonte */
+        }
+
+        input[type="submit"]:hover {
+            background-color: #45a049; /* Fundo verde mais escuro no hover */
+        }
+
+        /* Mensagens do sistema */
+        .mensagem {
+            background-color: #f8f8f8; /* Fundo cinza bem claro */
+            border-left: 4px solid #4CAF50; /* Borda lateral verde */
+            padding: 10px; /* Espaçamento interno */
+            margin: 20px 0; /* Espaçamento acima e abaixo */
+            border-radius: 5px; /* Bordas arredondadas */
+        }
+
+        /* Botões e links */
+        .btn {
+            display: inline-block; /* Exibe como botão */
+            padding: 5px 10px; /* Espaçamento interno */
+            border-radius: 3px; /* Bordas arredondadas */
+            text-decoration: none; /* Remove sublinhado */
+            color: #fff; /* Texto branco */
+            font-size: 14px; /* Tamanho da fonte */
+            margin-right: 10px; /* Espaçamento entre botões */
+        }
+
+        .btn-editar {
+            background-color: #2196F3; /* Azul */
+        }
+
+        .btn-editar:hover {
+            background-color: #1976D2; /* Azul mais escuro no hover */
+        }
+
+        .btn-excluir {
+            background-color: #f44336; /* Vermelho */
+        }
+
+        .btn-excluir:hover {
+            background-color: #d32f2f; /* Vermelho mais escuro no hover */
+        }
+
+        /* Links comuns */
+        a {
+            color: #007bff; /* Azul padrão */
+            text-decoration: none; /* Remove sublinhado */
+        }
+
+        a:hover {
+            text-decoration: underline; /* Adiciona sublinhado ao passar o mouse */
+        }
+    </style>
+
+
 </head>
 <body>
     <!-- Cabeçalho com informações de login -->
