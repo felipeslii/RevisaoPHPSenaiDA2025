@@ -4,22 +4,63 @@
 // ==========================================
 
 
-// 1ª Digitação (Aqui)
+class cachorro {
+    private $nome;
+    private $comida;
+    private $sono;
+
+    public function __construct($nome, $comida, $sono) {
+        $this->nome = $nome;
+        $this->comida = $comida;
+        $this->sono = $sono;
+    }
+
+    public function comer () {
+        if ($this->comida > 0) {
+            $this->comida -= 1;
+        }
+    }
+
+    public function dormir () {
+        $this->sono = false;
+    }
+
+    // Getters e Setters (comuns no PHP)
+    public function getNome() {
+        return $this->nome;
+    }
+
+    public function getComida() {
+        return $this->comida;
+    }
+
+    public function getSono() {
+        return $this->sono;
+    }
+}
 
 
 // Criando vários cachorros
-// $cachorros = [
-//     new Cachorro("Cléo", 247, true),
-//     new Cachorro("Francisco", 5, true),
-//     new Cachorro("Conan", 19, false),
-//     new Cachorro("Leleco", 3, false),
-//     new Cachorro("Babi", 13, true)
-// ];
+$cachorros = [
+    new cachorro("Cléo", 247, true),
+    new cachorro("Francisco", 5, true),
+    new cachorro("Conan", 19, false),
+    new cachorro("Leleco", 3, false),
+    new cachorro("Babi", 13, true)
+];
 
 // Usando métodos para manipular os objetos
 
 
-// 2ª Digitação (Aqui)
+foreach ($cachorros as $cachorro) {
+    if ($cachorro->getComida() > 0) {
+        $cachorro->comer();
+    }
+
+    if ($cachorro->getSono()) {
+        $cachorro->dormir();
+    }
+}
 
 
 // Exibindo os resultados no navegador
@@ -28,7 +69,7 @@ echo "<!DOCTYPE html>
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Resultados dos Cachorros (POO)</title>
+    <title>Resultados da Cachorrada (POO)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -43,7 +84,7 @@ echo "<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <h1>Resultados dos Cachorros (POO)</h1>";
+    <h1>Resultados da Cachorrada(POO)</h1>";
 
 foreach ($cachorros as $cachorro) {
     echo "<p><strong>{$cachorro->getNome()}</strong>:</p>";
