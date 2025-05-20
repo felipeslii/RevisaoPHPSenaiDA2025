@@ -26,6 +26,7 @@ if (!Auth::estaLogado() && !in_array($pagina, ['login', 'autenticar'])) {
 
 // Roteamento básico (Teste de autenticação)
 switch ($pagina) {
+    // Ações de autenticação
     case 'login':
         $authController->login();
         break;
@@ -35,12 +36,33 @@ switch ($pagina) {
     case 'logout':
         $authController->logout();
         break;
+
+    // Ações de gestão de itens
     case 'lista':
         $itemController->listar();
         break;
     case 'visualizar':
         $itemController->visualizar($_GET['id'] ?? 0);
         break;
+    case 'adicionar':
+        $itemController->adicionar();
+        break;
+    case 'salvar':
+        $itemController->salvar();
+        break;
+    case 'editar':
+        $itemController->editar($_GET['id'] ?? 0);
+        break;
+    case 'atualizar':
+        $itemController->atualizar($_POST['id'] ?? 0);
+        break;
+    case 'excluir':
+        $itemController->confirmarExclusao($_GET['id'] ?? 0);
+        break;
+    case 'excluir_confirmar':
+        $itemController->excluir($_GET['id'] ?? 0);
+        break;
+    // Ações padrão
     default:
         header('Location: index.php?pagina=' .(Auth::estaLogado() ? 'lista' : 'login'));
         exit;
